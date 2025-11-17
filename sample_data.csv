@@ -1,0 +1,8 @@
+date,region,sales,marketing_spend,profit,city
+2020-01-15,East,1000,200,200,CityA
+2020-02-15,East,1100,210,220,CityA
+2020-03-15,West,900,180,150,CityB
+2020-04-15,North,1500,300,400,CityC
+2020-05-15,South,1300,250,300,CityD
+2020-06-15,East,1250,240,280,CityA
+2020-07-15,West,1400,260,320,CityB

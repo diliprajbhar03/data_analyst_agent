@@ -1,0 +1,16 @@
+streamlit
+pandas
+numpy
+matplotlib
+seaborn
+plotly
+scikit-learn
+jinja2
+openai
+sqlalchemy
+psycopg2-binary
+tabulate
+python-dotenv
+joblib
+statsmodels
+prophet

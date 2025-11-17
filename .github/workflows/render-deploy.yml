@@ -1,0 +1,25 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Render CLI
+        run: |
+          curl -fsSL https://render.com/install | bash
+
+      - name: Build Docker Image
+        run: docker build -t advanced_data_agent:latest .
+
+      - name: Deploy to Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          render services deploy ${{ secrets.RENDER_SERVICE_ID }} --from-branch main
