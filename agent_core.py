@@ -29,7 +29,7 @@ def load_data(file):
             return pd.read_excel(file)
 
 def profile_data(df, top_n=20):
-    # ✨ 1. Prevent crashes — handle empty
+    # Handle empty or missing data
     if df is None or df.empty:
         return {
             "error": "No data uploaded. Please upload a CSV/Excel file first."
@@ -37,27 +37,26 @@ def profile_data(df, top_n=20):
 
     summary = {}
 
-    # ✨ 2. Basic info
+    # Shape & dtypes
     summary["shape"] = df.shape
     summary["dtypes"] = df.dtypes.astype(str).to_dict()
 
-    # ✨ 3. Missing values
+    # Missing values
     summary["missing"] = (
         df.isnull().sum().sort_values(ascending=False).head(top_n).to_dict()
     )
 
-    # ✨ 4. Numeric summary (safe)
+    # Numeric summary
     num = df.select_dtypes(include=[np.number])
     if not num.empty:
         summary["numeric_summary"] = num.describe().T.to_dict()
     else:
         summary["numeric_summary"] = "No numeric columns found."
 
-    # ✨ 5. Unique values
+    # Unique counts
     summary["n_uniques"] = {col: int(df[col].nunique()) for col in df.columns}
 
     return summary
-
 
 def cleaning_suggestions(df):
     suggestions = []
