@@ -105,24 +105,86 @@ def train_model(df, target, task='regression', random_state=42, n_iter=25):
     return {'model': model, 'metrics': metrics, 'feature_importances': fi, 'columns': list(X_proc.columns)}
 
 def forecast_series(df, date_col, value_col, periods=12):
-    df2 = df[[date_col, value_col]].dropna()
-    df2[date_col] = pd.to_datetime(df2[date_col])
+    # -----------------------------
+    # 1️⃣ Select required columns
+    # -----------------------------
+    df2 = df[[date_col, value_col]].copy()
+    df2 = df2.dropna()
+
+    # -----------------------------
+    # 2️⃣ CLEAN VALUE COLUMN
+    # Remove:
+    # - Currency symbols (€, $, ₹, £)
+    # - Commas
+    # - Spaces
+    # - Percent signs
+    # -----------------------------
+    df2[value_col] = (
+        df2[value_col]
+        .astype(str)
+        .str.replace(r"[^\d\.\-\+]", "", regex=True)  # keep digits . + -
+    )
+
+    # Convert to numeric
+    df2[value_col] = pd.to_numeric(df2[value_col], errors="coerce")
+
+    # Drop rows that still failed conversion
+    df2 = df2.dropna(subset=[value_col])
+
+    # -----------------------------
+    # 3️⃣ CLEAN DATE COLUMN
+    # -----------------------------
+    df2[date_col] = pd.to_datetime(df2[date_col], errors="coerce")
+    df2 = df2.dropna(subset=[date_col])
+
+    # Sort chronologically
     df2 = df2.sort_values(date_col)
-    ds = df2[[date_col, value_col]].rename(columns={date_col: 'ds', value_col: 'y'})
+
+    # -----------------------------
+    # 4️⃣ Prepare for Prophet / ARIMA
+    # -----------------------------
+    ds = df2[[date_col, value_col]].rename(
+        columns={date_col: "ds", value_col: "y"}
+    )
+
+    # -----------------------------
+    # 5️⃣ PROPHET FORECASTING
+    # -----------------------------
     if HAS_PROPHET:
         m = Prophet()
         m.fit(ds)
-        future = m.make_future_dataframe(periods=periods, freq='MS')
+
+        # Auto-detect frequency (D/W/M)
+        if ds["ds"].diff().dt.days.mode()[0] > 25:
+            freq = "MS"  # monthly
+        else:
+            freq = "D"   # daily
+
+        future = m.make_future_dataframe(periods=periods, freq=freq)
         forecast = m.predict(future)
-        return forecast[['ds','yhat','yhat_lower','yhat_upper']]
-    else:
-        ts = ds.set_index('ds').resample('M').mean().interpolate()
-        model = ARIMA(ts['y'], order=(1,1,1))
-        res = model.fit()
-        pred = res.get_forecast(steps=periods)
-        index = pd.date_range(start=ts.index[-1] + pd.offsets.MonthBegin(), periods=periods, freq='M')
-        out = pd.DataFrame({'ds': index, 'yhat': pred.predicted_mean, 'yhat_lower': pred.conf_int().iloc[:,0], 'yhat_upper': pred.conf_int().iloc[:,1]})
-        return out
+
+        return forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]]
+
+    # -----------------------------
+    # 6️⃣ ARIMA BACKUP (if prophet not installed)
+    # -----------------------------
+    ts = ds.set_index("ds")["y"]
+    ts = ts.asfreq("MS").interpolate()
+
+    model = ARIMA(ts, order=(1, 1, 1))
+    res = model.fit()
+
+    pred = res.get_forecast(steps=periods)
+    index = pd.date_range(start=ts.index[-1] + pd.offsets.MonthBegin(), periods=periods, freq="MS")
+
+    out = pd.DataFrame({
+        "ds": index,
+        "yhat": pred.predicted_mean,
+        "yhat_lower": pred.conf_int().iloc[:, 0],
+        "yhat_upper": pred.conf_int().iloc[:, 1]
+    })
+
+    return out
 
 REPORT_TEMPLATE = '''<html><head><meta charset="utf-8"><title>Agent Report</title></head><body>
 <h1>Data Agent Report</h1>
